@@ -1,6 +1,6 @@
 class TasksController < ApplicationController
-  before_action :load_event, only: [:create, :show, :edit, :update, :destroy]
-  before_action :load_task, only: [:show, :edit, :update, :destroy]
+  before_action :load_event, only: [:create, :show, :edit, :update, :destroy, :change_time, :new]
+  before_action :load_task, only: [:show, :edit, :update, :destroy, :change_time]
 
   # GET /tasks
   def index
@@ -8,7 +8,7 @@ class TasksController < ApplicationController
   end
 
   # GET /tasks/1
-  def show
+  def show   
   end
 
   # GET /tasks/new
@@ -45,19 +45,42 @@ class TasksController < ApplicationController
     @task.destroy
   end
 
+  def change_time
+    @task.update(start_time: params[:start_time], end_time: params[:end_time] || params[:start_time])
+    flash[:success] = "Cập nhật thành công"
+  end
+
   private
 
   def load_event
     @event = current_user.events.find_by id: params[:event_id]
+    add_breadcrumb @event.name, event_path(@event)
   end
 
   def load_task
     @task = @event.tasks.find_by id: params[:id]
+  
+    @task.parent_task ? handle_breadcrumb : 
+      add_breadcrumb(@task.id.to_s + "-" + @task.name, event_task_path(event_id: @event , id: @task), remote: true)
   end
 
 
   # Only allow a list of trusted parameters through.
   def task_params
-    params.require(:task).permit :name, :event_id, :description, :start_time, :end_time, :estimated_costs, :actual_costs, :location, :progress
+    params.require(:task).permit :name, :event_id, :description, :start_time, :end_time, :estimated_costs, 
+      :actual_costs, :location, :progress, :parent_id
+  end
+
+  def handle_breadcrumb
+    x = @task
+    sc = []
+    while x
+      sc << x
+      x = x.parent_task
+
+    end if x.parent_task
+    sc.reverse.each do |task|
+      add_breadcrumb task.id.to_s + "-" + task.name, event_task_path(event_id: @event , id: task), remote: true
+    end
   end
 end
